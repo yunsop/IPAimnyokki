@@ -1,0 +1,133 @@
+package main
+
+import (
+	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/app"
+	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/layout"
+	"fyne.io/fyne/v2/widget"
+)
+
+type ipaCategory struct {
+	Name    string
+	Symbols []string
+}
+
+func main() {
+	myApp := app.New()
+	myWindow := myApp.NewWindow("IPA (국제 음성 기호) 입력기")
+	myWindow.Resize(fyne.NewSize(720, 520))
+
+	entry := widget.NewMultiLineEntry()
+	entry.SetPlaceHolder("여기에 음성 기호를 입력하거나 아래 버튼을 클릭하세요...")
+	entry.Wrapping = fyne.TextWrapWord
+
+	
+	insertSymbol := func(sym string) {
+		runes := []rune(entry.Text)
+		pos := getCursorIndex(entry.Text, entry.CursorRow, entry.CursorColumn)
+		if pos > len(runes) {
+			pos = len(runes)
+		}
+
+		newText := string(runes[:pos]) + sym + string(runes[pos:])
+		entry.SetText(newText)
+
+		entry.CursorColumn += len([]rune(sym))
+		myWindow.Canvas().Focus(entry)
+	}
+
+	copyBtn := widget.NewButton("전체 복사", func() {
+		myWindow.Clipboard().SetContent(entry.Text)
+	})
+
+	wrapPhonemeBtn := widget.NewButton("/음소/ 감싸기", func() {
+		entry.SetText("/" + entry.Text + "/")
+	})
+
+	wrapPhoneticBtn := widget.NewButton("[음성] 감싸기", func() {
+		entry.SetText("[" + entry.Text + "]")
+	})
+
+	backspaceBtn := widget.NewButton("← 지우기", func() {
+		runes := []rune(entry.Text)
+		pos := getCursorIndex(entry.Text, entry.CursorRow, entry.CursorColumn)
+		if pos > 0 && pos <= len(runes) {
+			entry.SetText(string(runes[:pos-1]) + string(runes[pos:]))
+			if entry.CursorColumn > 0 {
+				entry.CursorColumn--
+			}
+		}
+		myWindow.Canvas().Focus(entry)
+	})
+
+	clearBtn := widget.NewButton("초기화", func() {
+		entry.SetText("")
+		myWindow.Canvas().Focus(entry)
+	})
+
+	toolbar := container.NewHBox(
+		copyBtn,
+		wrapPhonemeBtn,
+		wrapPhoneticBtn,
+		backspaceBtn,
+		layout.NewSpacer(),
+		clearBtn,
+	)
+	categories := []ipaCategory{
+		{
+			Name:    "모음",
+			Symbols: []string{"i", "y", "ɨ", "ʉ", "ɯ", "u", "ɪ", "ʏ", "ʊ", "e", "ø", "ɘ", "ɵ", "ɤ", "o", "ə", "ɛ", "œ", "ɜ", "ɞ", "ʌ", "ɔ", "æ", "ɐ", "a", "ɶ", "ɑ", "ɒ"},
+		},
+		{
+			Name:    "폐장성 자음",
+			Symbols: []string{"p", "b", "t", "d", "ʈ", "ɖ", "c", "ɟ", "k", "g", "q", "ɢ", "ʔ", "m", "ɱ", "n", "ɳ", "ɲ", "ŋ", "ɴ", "ʙ", "r", "ʀ", "ⱱ", "ɾ", "ɽ", "ɸ", "β", "f", "v", "θ", "ð", "s", "z", "ʃ", "ʒ", "ʂ", "ʐ", "ç", "ʝ", "x", "ɣ", "χ", "ʁ", "ħ", "ʕ", "h", "ɦ", "ɬ", "ɮ", "ʋ", "ɹ", "ɻ", "j", "ɰ", "l", "ɭ", "ʎ", "ʟ"},
+		},
+		{
+			Name:    "비폐장성 / 기타",
+			Symbols: []string{"ʘ", "ǀ", "ǃ", "ǂ", "ǁ", "ɓ", "ɗ", "ʄ", "ɠ", "ʛ", "ʍ", "w", "ɥ", "ʜ", "ʢ", "ʡ", "ɕ", "ʑ", "ɺ", "ɧ", "t͡s", "d͡z", "t͡ʃ", "d͡ʒ"},
+		},
+		{
+			Name:    "초분절음 / 기호
+			Symbols: []string{"ˈ", "ˌ", "ː", "ˑ", "˘", ".", "‿", "ʰ", "ʷ", "ʲ", "ˠ", "ˤ", "ⁿ", "ˡ", "̚", "̥", "̬", "̃", "̩", "̯", "̪", "̺", "̻"},
+		},
+	}
+
+
+	tabs := container.NewAppTabs()
+	for _, cat := range categories {
+		var buttons []fyne.CanvasObject
+		for _, sym := range cat.Symbols {
+			s := sym // 클로저 변수 캡처
+			btn := widget.NewButton(s, func() {
+				insertSymbol(s)
+			})
+			buttons = append(buttons, btn)
+		}
+		grid := container.NewGridWithColumns(10, buttons...)
+		tabs.Append(container.NewTabItem(cat.Name, container.NewVScroll(grid)))
+	}
+  
+	topSection := container.NewVBox(entry, toolbar)
+	content := container.NewBorder(topSection, nil, nil, nil, tabs)
+
+	myWindow.SetContent(content)
+	myWindow.ShowAndRun()
+}
+
+func getCursorIndex(text string, row, col int) int {
+	runes := []rune(text)
+	currRow, currCol := 0, 0
+	for i, r := range runes {
+		if currRow == row && currCol == col {
+			return i
+		}
+		if r == '\n' {
+			currRow++
+			currCol = 0
+		} else {
+			currCol++
+		}
+	}
+	return len(runes)
+}
